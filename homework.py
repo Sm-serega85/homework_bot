@@ -1,11 +1,13 @@
 import logging
 import os
 import time
-from http import HTTPStatus
-from logging import StreamHandler
-
 import requests
 import telegram
+import exceptions
+
+
+from http import HTTPStatus
+from logging import StreamHandler
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -45,37 +47,40 @@ handler.setFormatter(formatter)
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     try:
-        bot.send_message(
-            chat_id=TELEGRAM_CHAT_ID,
-            text=message,
-        )
-        logger.info('Сообщение отправлено')
-    except Exception:
-        logger.error('Сообщение не отправлено')
-    else:
-        logger.debug('удачная отправка')
+        logging.debug('Попытка отправки сообщения в telegram')
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logging.debug('Отправка сообщения в telegram')
+    except telegram.error.TelegramError as error:
+        logging.error(f'Не удалось отправить сообщение в telegram: {error}')
+        raise Exception(error)
 
 
 def get_api_answer(current_timestamp):
     """Получить статус домашней работы."""
     timestamp = current_timestamp or int(time.time())
-    params = {'from_date': timestamp}
+    params_request = {
+        'url': ENDPOINT,
+        'headers': HEADERS,
+        'params': {'from_date': timestamp},
+    }
     try:
-        response = requests.get(
-            ENDPOINT,
-            headers=HEADERS,
-            params=params
-        )
-        logger.info('Запрос на сервер отправлен')
+        logging.info(
+            'Начало запроса: url = {url},'
+            'headers = {headers},'
+            'params = {params}'.format(**params_request))
+        homework_statuses = requests.get(**params_request)
+        if homework_statuses.status_code != HTTPStatus.OK:
+            raise exceptions.InvalidResponseCode(
+                'Не удалось получить ответ API, '
+                f'ошибка: {homework_statuses.status_code}'
+                f'причина: {homework_statuses.reason}'
+                f'текст: {homework_statuses.text}')
+        return homework_statuses.json()
     except Exception:
-        logger.error('Запрос на сервер не отправлен')
-    if response.status_code != HTTPStatus.OK:
-        raise logger.error('Не удалось получить ответ API'
-                           f'ошибка: {response.status_code}')
-    try:
-        return response.json()
-    except Exception:
-        raise logger.error('Ответ от сервера не в json формате')
+        raise exceptions.ConnectinError(
+            'Не верный код ответа параметры запроса: url = {url},'
+            'headers = {headers},'
+            'params = {params}'.format(**params_request))
 
 
 def check_response(response):
@@ -119,8 +124,7 @@ def check_tokens():
 def main():
     """Основная логика работы бота."""
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    last_homework_time = 1630000000
-    current_timestamp = last_homework_time
+    current_timestamp = 1630000000
     STATUS = ''
     if not check_tokens():
         logger.critical = ('Отсутсвуют переменные окружения')
