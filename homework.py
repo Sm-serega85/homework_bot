@@ -67,10 +67,10 @@ def get_api_answer(current_timestamp):
         'params': {'from_date': timestamp},
     }
     text = (
-            'Не верный код ответа параметры запроса: url = {url},'
-            'headers = {headers},'
-            'params = {params}'.format(**params_request)
-            )
+        'Не верный код ответа параметры запроса: url = {url},'
+        'headers = {headers},'
+        'params = {params}'.format(**params_request)
+    )
     try:
         logging.info(text)
         homework_statuses = requests.get(**params_request)
