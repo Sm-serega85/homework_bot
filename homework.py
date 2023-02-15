@@ -4,11 +4,14 @@ import time
 import requests
 import telegram
 import exceptions
+import sys
 
 
 from http import HTTPStatus
 from logging import StreamHandler
 from dotenv import load_dotenv
+from exceptions import SendMessageError, ConnectinError
+from requests.exceptions import RequestException
 
 load_dotenv()
 
@@ -52,7 +55,7 @@ def send_message(bot, message):
         logging.debug('Отправка сообщения в telegram')
     except telegram.error.TelegramError as error:
         logging.error(f'Не удалось отправить сообщение в telegram: {error}')
-        raise Exception(error)
+        raise SendMessageError(error)
 
 
 def get_api_answer(current_timestamp):
@@ -63,11 +66,13 @@ def get_api_answer(current_timestamp):
         'headers': HEADERS,
         'params': {'from_date': timestamp},
     }
-    try:
-        logging.info(
-            'Начало запроса: url = {url},'
+    text = (
+            'Не верный код ответа параметры запроса: url = {url},'
             'headers = {headers},'
-            'params = {params}'.format(**params_request))
+            'params = {params}'.format(**params_request)
+            )
+    try:
+        logging.info(text)
         homework_statuses = requests.get(**params_request)
         if homework_statuses.status_code != HTTPStatus.OK:
             raise exceptions.InvalidResponseCode(
@@ -76,11 +81,8 @@ def get_api_answer(current_timestamp):
                 f'причина: {homework_statuses.reason}'
                 f'текст: {homework_statuses.text}')
         return homework_statuses.json()
-    except Exception:
-        raise exceptions.ConnectinError(
-            'Не верный код ответа параметры запроса: url = {url},'
-            'headers = {headers},'
-            'params = {params}'.format(**params_request))
+    except RequestException:
+        raise ConnectinError(text)
 
 
 def check_response(response):
@@ -128,7 +130,7 @@ def main():
     STATUS = ''
     if not check_tokens():
         logger.critical = ('Отсутсвуют переменные окружения')
-        raise Exception('Отсутсвуют переменные окружения')
+        sys.exit('Отсутсвуют переменные окружения')
     while True:
         try:
             response = get_api_answer(current_timestamp)

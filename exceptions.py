@@ -26,3 +26,8 @@ class EmptyResponseFromAPI(NotForSending):
 class TelegramError(NotForSending):
     """Ошибка телеграма."""
     pass
+
+
+class SendMessageError(Exception):
+    """Ошибка """
+    pass
